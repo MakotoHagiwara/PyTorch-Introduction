@@ -6,7 +6,7 @@ import numpy as np
 import gym
 import random
 
-from model import QFunc
+from model import DuelingQFunc
 from ReplayMemory import ReplayMemory
 
 lr = 1e-3
@@ -15,8 +15,8 @@ epsilon = 0.3
 batch_size = 32
 initial_exploration = 500
 
-qf = QFunc()
-target_qf = QFunc()
+qf = DuelingQFunc()
+target_qf = DuelingQFunc()
 #model.state_dict():モデルの学習パラメータをとってきている
 target_qf.load_state_dict(qf.state_dict())
 
@@ -32,7 +32,7 @@ action_size = env.action_space.n
 
 total_step = 0
 
-for episode in range(150):
+for episode in range(200):
     done = False
     obs = env.reset()
     sum_reward = 0
@@ -73,7 +73,7 @@ for episode in range(150):
             next_q_value = target_qf(batch['next_obs']).max(dim = 1, keepdim = True)[0]
             target_q_value = batch['rewards'] + gamma * next_q_value * (1 - batch['terminates'])
             
-        loss =criterion(q_value, target_q_value)
+        loss = criterion(q_value, target_q_value)
         
         optimizer.zero_grad()
         
