@@ -11,25 +11,21 @@ class DuelingQFunc(nn.Module):
         self.obs_size = obs_size
         self.action_size = action_size
         #dueling networkは状態以下の部分でネットワークを2分割して価値観数Vとアドバンテージ関数Aを推定する(ただしネットワークを分離しているだけ)
+        self.shared_l1 = nn.Linear(in_features = obs_size, out_features = 50)
         #価値観数Vのネットワーク
-        self.value_l1 = nn.Linear(in_features = obs_size, out_features = 50)
-        #self.value_l2 = nn.Linear(in_features = 50, out_features = 50)
         self.value_layer = nn.Linear(in_features = 50, out_features = 1)
         #アドバンテージ関数Aのネットワーク
-        self.advantage_l1 = nn.Linear(in_features = obs_size, out_features = 50)
-        #self.advantage_l2 = nn.Linear(in_features = 50, out_features = 50)
         self.advantage_layer = nn.Linear(in_features = 50, out_features = action_size)
         self.q_layer = nn.Linear(in_features = action_size + 1, out_features = action_size)
         
         
     def forward(self, x):
-        x1 = torch.relu(self.value_l1(x))
-        #x1 = torch.relu(self.value_l2(x1))
-        x1 = self.value_layer(x1)
-        x2 = torch.relu(self.advantage_l1(x))
-        #x2 = torch.relu(self.advantage_l2(x2))
-        x2 = self.advantage_layer(x2)
-        q_value = x1 + x2 - x2.mean()
+        shared_value = torch.relu(self.shared_l1(x))
+        value = self.value_layer(shared_value)
+        advantage = self.advantage_layer(shared_value)
+        #torch.mean(dim, keepdim)->Tensor
+        #dim:次元数 keepdim:バッチの次元を維持するかどうか
+        q_value = value + advantage - advantage.mean(dim = 1, keepdim = True)
         #torchの型が戻り値
         return q_value
     
