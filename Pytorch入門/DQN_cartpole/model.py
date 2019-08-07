@@ -26,7 +26,9 @@ class QFunc(nn.Module):
         # no_gradの間は計算グラフが構築されない
         with torch.no_grad():
             q = self.forward(x)
-        #q.max(1) = torch.max(q, 1) -> [q_value, index]
+        #q.max(index) = torch.max(q, index) -> [[q_value], [index]]
+        #バッチに対して考えるのであればtorch.max()[i]は各バッチに対する最大値のリストを返している
         #最大値のインデックスの最大値を取得してnumpyに格納する
+        #tensorからscalerをとってきたとしてもtensorの型のままなので変換してやる必要がある
         action = q.max(1)[1][0].numpy()
         return action
