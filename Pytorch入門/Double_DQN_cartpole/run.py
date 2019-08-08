@@ -31,6 +31,7 @@ obs_size =env.observation_space.shape[0]
 action_size = env.action_space.n
 
 total_step = 0
+ten_step = 0
 
 for episode in range(200):
     done = False
@@ -67,10 +68,16 @@ for episode in range(200):
             
         batch = memory.sample()
         
+        #各サンプルにおける状態行動の値を取ってくる
         q_value = qf(batch['obs']).gather(1, batch['actions'])
         
+        #サンプルごとの処理を同時に行う
         with torch.no_grad():
-            next_q_value = target_qf(batch['next_obs']).max(dim = 1, keepdim = True)[0]
+            #Q-networkにおける最大値のインデックスを取ってくる
+            max_next_q_value_index = qf(batch['next_obs']).max(dim = 1, keepdim = True)[1]
+            #target-Q-network内の、対応する行動のインデックスにおける価値関数の値を取ってくる
+            next_q_value = target_qf(batch['next_obs']).gather(1, max_next_q_value_index)
+            #目的とする値の導出
             target_q_value = batch['rewards'] + gamma * next_q_value * (1 - batch['terminates'])
         
         #誤差の計算
@@ -86,5 +93,7 @@ for episode in range(200):
             #targetネットワークの更新
             target_qf.load_state_dict(qf.state_dict())
             
+    ten_step += step
     if episode % 10 == 0:
-        print('episode:',episode, 'return:', step, 'epsilon:', epsilon)
+        print('episode:',episode, 'return:', ten_step / 10.0, 'epsilon:', epsilon)
+        ten_step = 0
