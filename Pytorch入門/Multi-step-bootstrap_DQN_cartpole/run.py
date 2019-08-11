@@ -15,7 +15,7 @@ gamma = 0.95
 epsilon = 0.3
 batch_size = 32
 initial_exploration = 500
-N_STEP = 5
+N_STEP = 3
 step_reward = 0
 
 qf = DuelingQFunc()
@@ -45,12 +45,9 @@ for episode in range(200):
     sum_reward = 0
     step = 0
     step_reward = 0
-    while not obs_queue.empty():
-        obs_queue.get()
-    while not reward_queue.empty():
-        reward_queue.get()
-    while not action_queue.empty():
-        action_queue.get()
+    obs_queue = queue.Queue()
+    reward_queue = queue.Queue()
+    action_queue = queue.Queue()
     
     while not done:
         if random.random() < epsilon:
@@ -79,6 +76,13 @@ for episode in range(200):
         if step >= N_STEP - 1:
             memory.add(obs_queue.get(), action_queue.get(), step_reward, next_obs, terminal)
             step_reward -= reward_queue.get()
+            
+        if done:
+            while not action_queue.empty():
+                step_reward = step_reward / gamma
+                memory.add(obs_queue.get(), action_queue.get(), step_reward, next_obs, terminal)
+                step_reward -= reward_queue.get()
+            
         obs = next_obs.copy()
         
         step += 1
