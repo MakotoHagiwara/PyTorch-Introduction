@@ -74,15 +74,28 @@ for episode in range(200):
         step_reward = step_reward / gamma + reward * (gamma ** N_STEP)
         
         if step >= N_STEP - 1:
-            memory.add(obs_queue.get(), action_queue.get(), step_reward, next_obs, terminal)
-            step_reward -= reward_queue.get()
+            with torch.no_grad():
+                max_next_q_value = qf(torch.Tensor([next_obs])).max().numpy()
+                current_state = obs_queue.get()
+                current_action = action_queue.get()
+                q_value = qf(torch.Tensor([current_state]))[0][current_action].numpy()
+                td_error = abs(step_reward + max_next_q_value * (gamma ** N_STEP) - q_value) + 0.01
+                priority = td_error
+                memory.add(current_state, current_action, step_reward, next_obs, priority, terminal)
+                step_reward -= reward_queue.get()
             
         if done:
             while not action_queue.empty():
-                step_reward = step_reward / gamma
-                memory.add(obs_queue.get(), action_queue.get(), step_reward, next_obs, terminal)
-                step_reward -= reward_queue.get()
-            
+                with torch.no_grad():
+                    step_reward = step_reward / gamma
+                    max_next_q_value = qf(torch.Tensor([next_obs])).max().numpy()
+                    current_state = obs_queue.get()
+                    current_action = action_queue.get()
+                    q_value = qf(torch.Tensor([current_state]))[0][current_action].numpy()
+                    td_error = abs(step_reward + max_next_q_value * (gamma ** N_STEP) - q_value) + 0.01
+                    priority = td_error
+                    memory.add(current_state, current_action, step_reward, next_obs, priority, terminal)
+                    step_reward -= reward_queue.get()
         obs = next_obs.copy()
         
         step += 1
@@ -90,7 +103,7 @@ for episode in range(200):
         if total_step < initial_exploration:
             continue
             
-        batch = memory.sample()
+        batch, indices = memory.sample()
         
         #各サンプルにおける状態行動の値を取ってくる
         q_value = qf(batch['obs']).gather(1, batch['actions'])
@@ -112,6 +125,17 @@ for episode in range(200):
         loss.backward()
         #勾配を更新する
         optimizer.step()
+        
+        with torch.no_grad():
+            q_value = qf(batch['obs']).gather(1, batch['actions'])
+            #Q-networkにおける最大値のインデックスを取ってくる
+            max_next_q_value_index = qf(batch['next_obs']).max(dim = 1, keepdim = True)[1]
+            #target-Q-network内の、対応する行動のインデックスにおける価値関数の値を取ってくる
+            next_q_value = target_qf(batch['next_obs']).gather(1, max_next_q_value_index)
+            #目的とする値の導出
+            target_q_value = batch['rewards'] + gamma * next_q_value * (1 - batch['terminates']) + 0.01
+            prioritys = (abs(target_q_value - q_value)).numpy().squeeze()
+            memory.update(indices, prioritys)
         
         if total_step % 10 == 0:
             #targetネットワークの更新
