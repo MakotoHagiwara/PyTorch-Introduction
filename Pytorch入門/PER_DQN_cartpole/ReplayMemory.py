@@ -12,7 +12,7 @@ class ReplayMemory:
         self.rewards = np.zeros((self.memory_size, 1), dtype = np.float)
         self.next_obs = np.zeros((self.memory_size, obs_size), dtype = np.float)
         #メモリ使用量削減のためにfloatではなくintで保存する
-        self.prioritys = np.zeros((self.memory_size, 1), dtype = np.float)
+        self.priorities = np.zeros((self.memory_size), dtype = np.float)
         self.terminates = np.zeros((self.memory_size, 1), dtype = np.int)
         
     def add(self, obs, action, reward, next_obs, priority, terminate):
@@ -21,13 +21,13 @@ class ReplayMemory:
         #報酬と終端に関してはサイズ1の要素を格納している
         self.rewards[self.index % self.memory_size][0] = reward
         self.next_obs[self.index % self.memory_size] = next_obs
-        self.prioritys[self.index % self.memory_size][0] = priority
+        self.priorities[self.index % self.memory_size] = priority
         self.terminates[self.index % self.memory_size][0] = terminate
         self.index += 1
         
     def sample(self):
         index = min(self.memory_size, self.index)
-        w = np.array(self.prioritys[ : index]) / sum(self.prioritys[ : index])
+        w = np.array(self.priorities[ : index]) / np.sum(self.priorities[ : index])
         size_indices = np.arange(index)
         indices = np.random.choice(a = size_indices, 
                                    size = self.batch_size, 
@@ -41,6 +41,5 @@ class ReplayMemory:
         batch['terminates'] = torch.Tensor(self.terminates[indices])
         return batch, indices
     
-    def update(self, indices, prioritys):
-        for i in range(self.batch_size):
-            self.prioritys[indices[i]][0] = prioritys[i]
+    def update_priority(self, indices, priorities):
+        self.priorities[indices] = priorities
