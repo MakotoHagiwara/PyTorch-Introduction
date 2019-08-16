@@ -75,7 +75,8 @@ for episode in range(200):
         
         if step >= N_STEP - 1:
             with torch.no_grad():
-                max_next_q_value = target_qf(torch.Tensor([next_obs])).max().numpy()
+                max_next_q_value_index = qf(torch.Tensor([next_obs])).max(dim = 1, keepdim = True)[1].numpy().squeeze()
+                max_next_q_value = target_qf(torch.Tensor([next_obs]))[0][max_next_q_value_index].numpy()
                 current_state = obs_queue.get()
                 current_action = action_queue.get()
                 q_value = qf(torch.Tensor([current_state]))[0][current_action].numpy()
@@ -88,7 +89,8 @@ for episode in range(200):
             while not action_queue.empty():
                 with torch.no_grad():
                     step_reward = step_reward / gamma
-                    max_next_q_value = target_qf(torch.Tensor([next_obs])).max().numpy()
+                    max_next_q_value_index = qf(torch.Tensor([next_obs])).max(dim = 1, keepdim = True)[1].numpy().squeeze()
+                    max_next_q_value = target_qf(torch.Tensor([next_obs]))[0][max_next_q_value_index].numpy()
                     current_state = obs_queue.get()
                     current_action = action_queue.get()
                     q_value = qf(torch.Tensor([current_state]))[0][current_action].numpy()
