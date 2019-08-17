@@ -105,10 +105,13 @@ for episode in range(200):
         if total_step < initial_exploration:
             continue
             
-        batch, indices = memory.sample()
+        batch, indices, probability_distribution = memory.sample()
         
         #各サンプルにおける状態行動の値を取ってくる
         q_value = qf(batch['obs']).gather(1, batch['actions'])
+        #PERにおけるimportance samplingによるバイアスを打ち消すための処理
+        weight = torch.tensor(np.power(probability_distribution, -1) / batch_size, dtype = torch.float)
+        q_value = q_value * weight
         
         #サンプルごとの処理を同時に行う
         with torch.no_grad():
@@ -118,6 +121,8 @@ for episode in range(200):
             next_q_value = target_qf(batch['next_obs']).gather(1, max_next_q_value_index)
             #目的とする値の導出
             target_q_value = batch['rewards'] + gamma * next_q_value * (1 - batch['terminates'])
+            #PERにおけるimportance samplingによるバイアスを打ち消すための処理
+            target_q_value = target_q_value * weight
         
         #誤差の計算
         loss = criterion(q_value, target_q_value)
@@ -131,11 +136,11 @@ for episode in range(200):
         with torch.no_grad():
             q_value = qf(batch['obs']).gather(1, batch['actions'])
             #Q-networkにおける最大値のインデックスを取ってくる
-            max_next_q_value_index = target_qf(batch['next_obs']).max(dim = 1, keepdim = True)[1]
+            max_next_q_value_index = qf(batch['next_obs']).max(dim = 1, keepdim = True)[1]
             #target-Q-network内の、対応する行動のインデックスにおける価値関数の値を取ってくる
             next_q_value = target_qf(batch['next_obs']).gather(1, max_next_q_value_index)
             #目的とする値の導出
-            target_q_value = batch['rewards'] + gamma * next_q_value * (1 - batch['terminates']) + 0.01
+            target_q_value = batch['rewards'] + gamma * next_q_value * (1 - batch['terminates'])
             priorities = (abs(target_q_value - q_value)).numpy().squeeze()
             memory.update_priority(indices, priorities)
         

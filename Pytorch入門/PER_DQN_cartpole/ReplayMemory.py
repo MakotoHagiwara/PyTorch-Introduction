@@ -2,7 +2,7 @@ import torch
 import numpy as np
 
 class ReplayMemory:
-    def __init__(self, memory_size = 10000, batch_size = 32, obs_size = 4):
+    def __init__(self, memory_size = 10000, batch_size = 32, obs_size = 4, alpha = 0.6):
         self.index = 0
         self.memory_size = memory_size
         self.batch_size = batch_size
@@ -14,6 +14,7 @@ class ReplayMemory:
         #メモリ使用量削減のためにfloatではなくintで保存する
         self.priorities = np.zeros((self.memory_size), dtype = np.float)
         self.terminates = np.zeros((self.memory_size, 1), dtype = np.int)
+        self.alpha = alpha
         
     def add(self, obs, action, reward, next_obs, priority, terminate):
         self.obs[self.index % self.memory_size] = obs
@@ -27,11 +28,12 @@ class ReplayMemory:
         
     def sample(self):
         index = min(self.memory_size, self.index)
-        w = np.array(self.priorities[ : index]) / np.sum(self.priorities[ : index])
+        priority_alpha = np.power(self.priorities[ : index] + 0.01, self.alpha)
+        probability_distribution = np.array(priority_alpha / np.sum(priority_alpha))
         size_indices = np.arange(index)
         indices = np.random.choice(a = size_indices, 
                                    size = self.batch_size, 
-                                   p = w.squeeze())
+                                   p = probability_distribution.squeeze())
         batch = dict()
         batch['obs'] = torch.Tensor(self.obs[indices])
         #intだとNNで読み込めないのでラベルやtensorのindexとして使えないのでlongを使う必要がある
@@ -39,7 +41,7 @@ class ReplayMemory:
         batch['rewards'] = torch.Tensor(self.rewards[indices])
         batch['next_obs'] = torch.Tensor(self.next_obs[indices])
         batch['terminates'] = torch.Tensor(self.terminates[indices])
-        return batch, indices
+        return batch, indices, probability_distribution
     
     def update_priority(self, indices, priorities):
         self.priorities[indices] = priorities
