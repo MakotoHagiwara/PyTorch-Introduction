@@ -22,14 +22,14 @@ class ReplayMemory:
         #報酬と終端に関してはサイズ1の要素を格納している
         self.rewards[self.index % self.memory_size][0] = reward
         self.next_obs[self.index % self.memory_size] = next_obs
-        self.priorities[self.index % self.memory_size] = priority
+        self.priorities[self.index % self.memory_size] = np.power(priority, self.alpha)
         self.terminates[self.index % self.memory_size][0] = terminate
         self.index += 1
         
     def sample(self):
         index = min(self.memory_size, self.index)
-        priority_alpha = np.power(self.priorities[ : index] + 0.01, self.alpha)
-        probability_distribution = np.array(priority_alpha / np.sum(priority_alpha))
+        #priority_alpha = np.power(self.priorities[ : index] + 0.01, self.alpha)
+        probability_distribution = np.array(self.priorities[ : index] / np.sum(self.priorities[ : index]))
         size_indices = np.arange(index)
         indices = np.random.choice(a = size_indices, 
                                    size = self.batch_size, 
@@ -44,4 +44,4 @@ class ReplayMemory:
         return batch, indices, probability_distribution
     
     def update_priority(self, indices, priorities):
-        self.priorities[indices] = priorities
+        self.priorities[indices] = np.power(priorities, self.alpha)
