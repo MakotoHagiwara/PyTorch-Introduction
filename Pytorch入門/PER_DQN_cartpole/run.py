@@ -110,8 +110,7 @@ for episode in range(200):
         #各サンプルにおける状態行動の値を取ってくる
         q_value = qf(batch['obs']).gather(1, batch['actions'])
         #PERにおけるimportance samplingによるバイアスを打ち消すための処理
-        weight = torch.tensor(np.power(probability_distribution, -1) / batch_size, dtype = torch.float)
-        q_value = q_value * weight
+        weights = torch.tensor(np.power(probability_distribution, -1) / batch_size, dtype = torch.float)
         
         #サンプルごとの処理を同時に行う
         with torch.no_grad():
@@ -121,11 +120,10 @@ for episode in range(200):
             next_q_value = target_qf(batch['next_obs']).gather(1, max_next_q_value_index)
             #目的とする値の導出
             target_q_value = batch['rewards'] + gamma * next_q_value * (1 - batch['terminates'])
-            #PERにおけるimportance samplingによるバイアスを打ち消すための処理
-            target_q_value = target_q_value * weight
-        
+            
+        #PERにおけるimportance samplingによるバイアスを打ち消すための処理
         #誤差の計算
-        loss = criterion(q_value, target_q_value)
+        loss = torch.mean(weights * (0.5 * (q_value - target_q_value) ** 2))
         #勾配を0にリセットする
         optimizer.zero_grad()
         #逆誤差伝搬を計算する
