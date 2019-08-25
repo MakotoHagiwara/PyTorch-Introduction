@@ -5,7 +5,7 @@ import numpy as np
 import gym
 from time import sleep
 import os
-from Actor_Process import actor_process
+from Actor import actor_process
 from Learner import learner_process
 
 def run():
@@ -13,16 +13,19 @@ def run():
     n_actors = 5
     path = os.path.join('./', 'memory.pt')
     model_path = os.path.join('./', 'model.pt')
+    target_model_path = os.path.join('./', 'target_model.pt')
     try:
         os.remove(path)
+        os.remove(model_path)
+        os.remove(target_model_path)
     except:
         pass
     
     processes = [mp.Process(target = learner_process,
-                                    args = (path, model_path))]
+                                    args = (path, model_path, target_model_path))]
     for actor_id in range(n_actors):
         processes.append(mp.Process(target = actor_process,
-                                    args = (path, model_path)))
+                                    args = (path, model_path, target_model_path)))
     for i in range(len(processes)):
         processes[i].start()
     for p in processes:

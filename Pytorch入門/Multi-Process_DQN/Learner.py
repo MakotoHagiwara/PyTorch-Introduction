@@ -10,14 +10,15 @@ import random
 from model import DuelingQFunc
 from ReplayMemory import ReplayMemory
 
-def learner_process(path, model_path):
-    learner = Learner_process(path, model_path)
+def learner_process(path, model_path, target_model_path):
+    learner = Learner(path, model_path, target_model_path)
     learner.run()
     
-class Learner_process:
-    def __init__(self, path, model_path):
+class Learner:
+    def __init__(self, path, model_path, target_model_path):
         self.path = path
         self.model_path = model_path
+        self.target_model_path = target_model_path
         self.lr = 1e-3
         self.gamma = 0.95
         self.epsilon = 0.3
@@ -39,13 +40,7 @@ class Learner_process:
                     try:
                         trans_memory = torch.load(self.path)
                         os.remove(self.path)
-                        for i in range(len(trans_memory['obs'])):
-                            self.memory.add(trans_memory['obs'][i],
-                                            trans_memory['action'][i],
-                                            trans_memory['reward'][i],
-                                            trans_memory['next_obs'][i],
-                                            trans_memory['priority'][i],
-                                            trans_memory['terminate'][i])
+                        self.memory.add_memory(trans_memory)
                         break
                     except:
                         sleep(np.random.random() * 2 + 2)
@@ -89,10 +84,6 @@ class Learner_process:
                 if self.total_step % 10 == 0:
                     #targetネットワークの更新
                     torch.save(self.qf.state_dict(), self.model_path)
-                    while True:
-                        try:
-                            self.target_qf.load_state_dict(self.qf.state_dict())
-                            break
-                        except:
-                            sleep(np.random.random() * 2 + 2)
+                    torch.save(self.target_qf.state_dict(), self.target_model_path)
+                    self.target_qf.load_state_dict(self.qf.state_dict())
                 self.total_step += 1    

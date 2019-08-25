@@ -12,14 +12,15 @@ import os
 from model import DuelingQFunc
 from ReplayMemory import ReplayMemory
 
-def actor_process(path, model_path):
-    actor = Actor(path, model_path)
+def actor_process(path, model_path, target_model_path):
+    actor = Actor(path, model_path, target_model_path)
     actor.run()
 
 class Actor:
-    def __init__(self, path, model_path):
+    def __init__(self, path, model_path, target_model_path):
         self.path = path
         self.model_path = model_path
+        self.target_model_path = target_model_path
         self.lr = 1e-3
         self.gamma = 0.95
         self.epsilon = 0.3
@@ -34,7 +35,6 @@ class Actor:
     
         self.optimizer = optim.Adam(self.qf.parameters(), lr = self.lr)
         self.criterion = nn.MSELoss()
-        self.memory = ReplayMemory()
         self.env = gym.make('CartPole-v0')
         self.obs_size = self.env.observation_space.shape[0]
         self.action_size = self.env.action_space.n
@@ -87,7 +87,6 @@ class Actor:
                         q_value = self.qf(torch.Tensor([current_state]))[0][current_action].numpy()
                         td_error = abs(self.step_reward + max_next_q_value * (self.gamma ** self.N_STEP) - q_value)
                         priority = td_error
-                        self.memory.add(current_state, current_action, self.step_reward, next_obs, priority, terminal)
                         self.temporal_memory.add(current_state, current_action, self.step_reward, next_obs, priority, terminal)
                         self.step_reward -= self.reward_queue.get()
                 if done:
@@ -101,7 +100,6 @@ class Actor:
                             q_value = self.qf(torch.Tensor([current_state]))[0][current_action].numpy()
                             td_error = abs(self.step_reward + max_next_q_value * (self.gamma ** self.N_STEP) - q_value)
                             priority = td_error
-                            self.memory.add(current_state, current_action, self.step_reward, next_obs, priority, terminal)
                             self.temporal_memory.add(current_state, current_action, self.step_reward, next_obs, priority, terminal)
                             self.step_reward -= self.reward_queue.get()
                     while True:
@@ -116,12 +114,12 @@ class Actor:
                                 #vstack = concatenate(axis = 0)
                                 #hstack = concatenate(axis = 1)
                                 temporal_memory_size = self.temporal_memory.get_memory_size()
-                                trans_memory['obs'] = np.vstack(trans_memory['obs'], self.temporal_memory.obs[ : temporal_memory_size])
-                                trans_memory['action'] = np.vstack(trans_memory['action'], self.temporal_memory.actions[ : temporal_memory_size])
-                                trans_memory['reward'] = np.vstack(trans_memory['reward'], self.temporal_memory.rewards[ : temporal_memory_size])
-                                trans_memory['next_obs'] = np.vstack(trans_memory['next_obs'], self.temporal_memory.next_obs[ : temporal_memory_size])
-                                trans_memory['priority'] = np.vstack(trans_memory['priority'], self.temporal_memory.priorities[ : temporal_memory_size])
-                                trans_memory['terminate'] = np.vstack(trans_memory['terminate'], self.temporal_memory.terminates[ : temporal_memory_size])
+                                trans_memory['obs'] = np.vstack((trans_memory['obs'], self.temporal_memory.obs[ : temporal_memory_size]))
+                                trans_memory['action'] = np.vstack((trans_memory['action'], self.temporal_memory.actions[ : temporal_memory_size]))
+                                trans_memory['reward'] = np.vstack((trans_memory['reward'], self.temporal_memory.rewards[ : temporal_memory_size]))
+                                trans_memory['next_obs'] = np.vstack((trans_memory['next_obs'], self.temporal_memory.next_obs[ : temporal_memory_size]))
+                                trans_memory['priority'] = np.hstack((trans_memory['priority'], self.temporal_memory.priorities[ : temporal_memory_size]))
+                                trans_memory['terminate'] = np.vstack((trans_memory['terminate'], self.temporal_memory.terminates[ : temporal_memory_size]))
                                 #メモリを保存
                                 torch.save(trans_memory, self.path)
                                 self.temporal_memory = ReplayMemory()
@@ -149,14 +147,14 @@ class Actor:
                     continue
             
                 if self.total_step % 10 == 0:
-                    #targetネットワークの更新
-                    self.target_qf.load_state_dict(self.qf.state_dict())
+                    #Learnerに基づいたネットワークの更新
                     while True:
                         if os.path.isfile(self.model_path):
                             try:
                                 self.qf.load_state_dict(torch.load(self.model_path))
+                                self.target_qf.load_state_dict(torch.load(self.target_model_path))
                                 break
-                            except:
+                            except FileNotFoundError:
                                 sleep(np.random.random() * 2 + 2)
             
             self.ten_step += step

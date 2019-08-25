@@ -26,9 +26,24 @@ class ReplayMemory:
         self.terminates[self.index % self.memory_size][0] = terminate
         self.index += 1
         
+    def add_memory(self, memory):
+        last_index = self.index % self.memory_size
+        next_index = (self.index + len(memory['obs'])) % self.memory_size
+        temp_index = list(range(last_index, next_index))
+        if last_index > next_index:
+            temp_index = list(range(last_index, self.memory_size))
+            temp_index[len(temp_index) : len(temp_index)] = list(range(next_index))
+        self.obs[temp_index] = memory['obs']
+        self.actions[temp_index] = memory['action']
+        #報酬と終端に関してはサイズ1の要素を格納している
+        self.rewards[temp_index] = memory['reward']
+        self.next_obs[temp_index] = memory['next_obs']
+        self.priorities[temp_index] = np.power(memory['priority'], self.alpha)
+        self.terminates[temp_index] = memory['terminate']
+        self.index += len(memory['obs'])
+        
     def sample(self):
         index = min(self.memory_size, self.index)
-        #priority_alpha = np.power(self.priorities[ : index] + 0.01, self.alpha)
         probability_distribution = np.array(self.priorities[ : index] / np.sum(self.priorities[ : index]))
         size_indices = np.arange(index)
         indices = np.random.choice(a = size_indices, 
@@ -45,9 +60,6 @@ class ReplayMemory:
     
     def get_memory_size(self):
         return min(self.index, self.memory_size)
-    
-    def get_obs(self):
-        return self.obs[ : self.get_memory_size()]
     
     def update_priority(self, indices, priorities):
         self.priorities[indices] = np.power(priorities, self.alpha)
