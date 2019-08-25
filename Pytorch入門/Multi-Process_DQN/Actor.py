@@ -12,15 +12,16 @@ import os
 from model import DuelingQFunc
 from ReplayMemory import ReplayMemory
 
-def actor_process(path, model_path, target_model_path):
-    actor = Actor(path, model_path, target_model_path)
+def actor_process(path, model_path, target_model_path, actor_index):
+    actor = Actor(path, model_path, target_model_path, actor_index)
     actor.run()
 
 class Actor:
-    def __init__(self, path, model_path, target_model_path):
+    def __init__(self, path, model_path, target_model_path, actor_index):
         self.path = path
         self.model_path = model_path
         self.target_model_path = target_model_path
+        self.actor_index =actor_index
         self.lr = 1e-3
         self.gamma = 0.95
         self.epsilon = 0.3
@@ -46,7 +47,7 @@ class Actor:
         self.temporal_memory = ReplayMemory()
         
     def run(self):
-        for episode in range(200):
+        for episode in range(1000):
             done = False
             obs = self.env.reset()
             sum_reward = 0
@@ -102,7 +103,7 @@ class Actor:
                             priority = td_error
                             self.temporal_memory.add(current_state, current_action, self.step_reward, next_obs, priority, terminal)
                             self.step_reward -= self.reward_queue.get()
-                    while True:
+                    while True and self.total_step % 50 == 0:
                         try:
                             if os.path.isfile(self.path):
                                 #メモリを読み込む
@@ -146,7 +147,7 @@ class Actor:
                 if self.total_step < self.initial_exploration:
                     continue
             
-                if self.total_step % 10 == 0:
+                if self.total_step % 50 == 0:
                     #Learnerに基づいたネットワークの更新
                     while True:
                         if os.path.isfile(self.model_path):
@@ -154,10 +155,10 @@ class Actor:
                                 self.qf.load_state_dict(torch.load(self.model_path))
                                 self.target_qf.load_state_dict(torch.load(self.target_model_path))
                                 break
-                            except FileNotFoundError:
+                            except (FileNotFoundError, EOFError, RuntimeError):
                                 sleep(np.random.random() * 2 + 2)
             
             self.ten_step += step
             if episode % 10 == 0:
-                print('episode:',episode, 'return:', self.ten_step / 10.0, 'epsilon:', self.epsilon)
+                print('ID:', self.actor_index, ' episode:',episode, 'return:', self.ten_step / 10.0, 'epsilon:', self.epsilon)
                 self.ten_step = 0

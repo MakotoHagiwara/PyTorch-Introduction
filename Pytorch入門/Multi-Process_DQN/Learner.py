@@ -35,7 +35,9 @@ class Learner:
         
     def run(self):
         while True:
+            read_step = 0
             while True and self.total_step % 100 == 0:
+                read_step += 1
                 if os.path.isfile(self.path):
                     try:
                         trans_memory = torch.load(self.path)
@@ -44,6 +46,8 @@ class Learner:
                         break
                     except:
                         sleep(np.random.random() * 2 + 2)
+                elif read_step > 25:
+                    break
             #一定以上の履歴が格納されていればモデルの学習を行う
             if self.memory.get_memory_size() > 100:
                 batch, indices, probability_distribution = self.memory.sample()
@@ -81,7 +85,7 @@ class Learner:
                     priorities = (abs(target_q_value - q_value)).numpy().squeeze()
                     self.memory.update_priority(indices, priorities)
         
-                if self.total_step % 10 == 0:
+                if self.total_step % 50 == 0:
                     #targetネットワークの更新
                     torch.save(self.qf.state_dict(), self.model_path)
                     torch.save(self.target_qf.state_dict(), self.target_model_path)

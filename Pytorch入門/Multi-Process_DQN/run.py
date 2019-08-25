@@ -25,7 +25,7 @@ def run():
                                     args = (path, model_path, target_model_path))]
     for actor_id in range(n_actors):
         processes.append(mp.Process(target = actor_process,
-                                    args = (path, model_path, target_model_path)))
+                                    args = (path, model_path, target_model_path, actor_id)))
     for i in range(len(processes)):
         processes[i].start()
     for p in processes:
